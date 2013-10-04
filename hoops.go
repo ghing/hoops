@@ -1,13 +1,10 @@
-package main
+package hoops
 
 import (
         "encoding/json"
         "errors"
-        "flag"
-	"fmt"
         "io"
         "io/ioutil"
-        "mime"
         "mime/multipart"
 	"net/http"
         "os"
@@ -92,7 +89,7 @@ func (h *ContributedHoop) getImageFilename(fh *multipart.FileHeader) (string) {
         return h.getFilenamePrefix() + ext
 }
 
-func setFileField(h *ContributedHoop, name string, f multipart.File, fh *multipart.FileHeader) {
+func setFileField(h *ContributedHoop, name string, f multipart.File, fh *multipart.FileHeader, dataDir string) {
         fileName := h.getImageFilename(fh)
         path := filepath.Join(dataDir, fileName) 
         fCopy, err := os.Create(path)
@@ -102,7 +99,7 @@ func setFileField(h *ContributedHoop, name string, f multipart.File, fh *multipa
         }
 }
 
-func (h *ContributedHoop) fromRequest(r *http.Request) {
+func (h *ContributedHoop) FromRequest(r *http.Request, dataDir string) {
         // TODO: Use reflect to iterate over the fields more dynamically
         // See http://blog.golang.org/laws-of-reflection
         setField(h, "Location", r.FormValue("location"))
@@ -116,12 +113,12 @@ func (h *ContributedHoop) fromRequest(r *http.Request) {
         if err == nil {
                 mtype := header.Header.Get("Content-Type")
                 if mtype == "image/jpeg" || mtype == "image/png" {
-                        setFileField(h, "image", image, header)
+                        setFileField(h, "image", image, header, dataDir)
                 }
         }
 }
 
-func (h *ContributedHoop) save() error {
+func (h *ContributedHoop) Save(dataDir string) error {
         filename := h.getFilenamePrefix() + ".json"
         path := filepath.Join(dataDir, filename) 
         jsonStr, err := json.Marshal(h)
@@ -129,40 +126,4 @@ func (h *ContributedHoop) save() error {
                 return err
         }
         return ioutil.WriteFile(path, jsonStr, 0600)
-}
-
-var port int
-var dataDir string
-
-func hoopsHandler(w http.ResponseWriter, r *http.Request) {
-        var hoopJSON []byte 
-        v := r.Header.Get("Content-Type")
-        d, _, err := mime.ParseMediaType(v)
-        if err != nil || d != "multipart/form-data" {
-                // TODO: Accept JSON
-                http.Error(w, "Request must be encoded as multipart/form-data", http.StatusBadRequest)
-                return
-        }
-
-        hoop := NewContributedHoop()
-        hoop.fromRequest(r)
-        err = hoop.save()
-        if err != nil {
-                http.Error(w, "Error saving hoop", http.StatusInternalServerError)
-                return
-        }
-        w.Header().Set("Content-Type", "application/json")
-        hoopJSON, err = json.Marshal(hoop)
-        fmt.Fprintf(w, string(hoopJSON))
-}
-
-func init() {
-        flag.IntVar(&port, "port", 8080, "port number")
-        flag.StringVar(&dataDir, "data-dir", "", "Directory to store uploaded files")
-}
-
-func main() {
-        flag.Parse()
-	http.HandleFunc("/api/0.1/hoops/", hoopsHandler)
-	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
