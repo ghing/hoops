@@ -34,7 +34,7 @@ func hoopsHandler(w http.ResponseWriter, r *http.Request) {
                 return
         }
         w.Header().Set("Content-Type", "application/json")
-        hoopJSON, err = json.Marshal(hoop.Attributes())
+        hoopJSON, err = json.Marshal(hoop)
         fmt.Fprintf(w, string(hoopJSON))
 }
 

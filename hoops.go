@@ -34,6 +34,7 @@ type Hoop interface {
         Id() string
         Created() time.Time
         Save(saver HoopSaver, mediaSaver HoopMediaSaver) error
+        MarshalJSON() ([]byte, error)
 }
 
 type HoopSaver interface {
@@ -59,7 +60,7 @@ type FilesystemHoopSaver struct {
 func (s FilesystemHoopSaver) Save(h Hoop) error {
         filename := getFilenamePrefix(h) + ".json"
         path := filepath.Join(s.DataDir, filename) 
-        jsonStr, err := json.Marshal(h.Attributes())
+        jsonStr, err := json.Marshal(h)
         if err != nil {
                 return err
         }
@@ -187,4 +188,8 @@ func (h *ContributedHoop) FromRequest(r *http.Request) {
                         h.imageFileHeader = header
                 }
         }
+}
+
+func (h *ContributedHoop) MarshalJSON() ([]byte, error) {
+        return json.Marshal(h.Attributes())
 }
