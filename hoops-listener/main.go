@@ -24,15 +24,17 @@ func hoopsHandler(w http.ResponseWriter, r *http.Request) {
                 return
         }
 
+        saver := hoops.FilesystemHoopSaver{DataDir:dataDir}
+        mediaSaver := hoops.FilesystemHoopMediaSaver{DataDir:dataDir}
         hoop := hoops.NewContributedHoop()
-        hoop.FromRequest(r, dataDir)
-        err = hoop.Save(dataDir)
+        hoop.FromRequest(r)
+        err = hoop.Save(hoops.HoopSaver(saver), hoops.HoopMediaSaver(mediaSaver))
         if err != nil {
                 http.Error(w, "Error saving hoop", http.StatusInternalServerError)
                 return
         }
         w.Header().Set("Content-Type", "application/json")
-        hoopJSON, err = json.Marshal(hoop)
+        hoopJSON, err = json.Marshal(hoop.Attributes())
         fmt.Fprintf(w, string(hoopJSON))
 }
 
