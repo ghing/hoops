@@ -52,7 +52,6 @@ func getFilenamePrefix(h Hoop) (string) {
         return dateStr + "-" + id
 }
 
-
 type FilesystemHoopSaver struct {
         DataDir string
 }
@@ -106,7 +105,6 @@ func (s FilesystemHoopMediaSaver) Save(h Hoop, f multipart.File, fh *multipart.F
         return
 }
 
-
 type ContributedHoop struct {
         attributes HoopAttributes
         imageFile multipart.File
@@ -125,9 +123,11 @@ func NewContributedHoop() *ContributedHoop {
 }
 
 func (h *ContributedHoop) Save(saver HoopSaver, mediaSaver HoopMediaSaver) error {
-        filename, err := mediaSaver.Save(Hoop(h), h.imageFile, h.imageFileHeader)
-        if err == nil {
-                h.attributes.Image = filename
+        if h.imageFile != nil {
+                filename, err := mediaSaver.Save(Hoop(h), h.imageFile, h.imageFileHeader)
+                if err == nil {
+                        h.attributes.Image = filename
+                }
         }
 
         return saver.Save(Hoop(h))
