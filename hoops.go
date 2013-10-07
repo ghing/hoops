@@ -22,7 +22,7 @@ type HoopAttributes struct {
         Lat float64
         Lng float64
         Image string
-        Story []byte
+        Story string 
         ContactOk bool
         Email string
         Phone string
