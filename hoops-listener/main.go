@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"mime"
 	"net/http"
@@ -13,17 +12,7 @@ import (
 	"github.com/ghing/hoops"
 )
 
-type HoopsListenerConfig struct {
-	Port                 int
-	DataDir              string
-	EmailSendingEmail    string
-	EmailSendingUsername string
-	EmailSendingPassword string
-	EmailSendingHost     string
-	NotificationEmail    string
-}
-
-var conf HoopsListenerConfig
+var conf hoops.HoopsConfig
 var configFilename string
 var sendEmail bool = false
 var smtpAuth smtp.Auth
@@ -73,20 +62,8 @@ func hoopsHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(hoopJSON))
 }
 
-func parseConfig(filename string, c *HoopsListenerConfig) error {
-	jsonData, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(jsonData, c)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func init() {
-	conf = HoopsListenerConfig{}
+	conf = hoops.HoopsConfig{}
 	flag.StringVar(&configFilename, "config", "", "Configuration file")
 }
 
@@ -95,7 +72,7 @@ func main() {
 	if configFilename == "" {
 		log.Fatal("You must specify a configuration file")
 	}
-	err := parseConfig(configFilename, &conf)
+	err := hoops.ParseConfig(configFilename, &conf)
 	if err != nil {
 		log.Fatal(err)
 	}

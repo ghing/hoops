@@ -16,6 +16,28 @@ import (
 	"time"
 )
 
+type HoopsConfig struct {
+	Port                 int
+	DataDir              string
+	EmailSendingEmail    string
+	EmailSendingUsername string
+	EmailSendingPassword string
+	EmailSendingHost     string
+	NotificationEmail    string
+}
+
+func ParseConfig(filename string, c *HoopsConfig) error {
+	jsonData, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(jsonData, c)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type HoopAttributes struct {
 	Id        string
 	Location  string
