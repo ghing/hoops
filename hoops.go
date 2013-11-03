@@ -3,7 +3,7 @@ package hoops
 import (
 	"encoding/json"
 	"errors"
-	"github.com/nu7hatch/gouuid"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -14,6 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/nu7hatch/gouuid"
+
+	"github.com/ghing/hoops/gspreadsheets"
 )
 
 type HoopsConfig struct {
@@ -119,6 +123,52 @@ func (s FilesystemHoopSaver) Save(h Hoop) error {
 		return err
 	}
 	return ioutil.WriteFile(path, jsonStr, 0600)
+}
+
+type GoogleSpreadsheetHoopSaver struct {
+	Key                 string
+	OAuthClientId       string
+	OAuthClientSecret   string
+	OAuthTokenCacheFile string
+}
+
+func (s GoogleSpreadsheetHoopSaver) rowXml(h Hoop) string {
+	attrs := h.Attributes()
+	template := `
+               <entry xmlns="http://www.w3.org/2005/Atom"
+                      xmlns:gsx="http://schemas.google.com/spreadsheets/2006/extended">
+                   <gsx:id>%s</gsx:id>
+                   <gsx:location>%s</gsx:location>
+                   <gsx:lat>%f</gsx:lat>
+                   <gsx:lng>%f</gsx:lng>
+                   <gsx:image>%s</gsx:image>
+                   <gsx:story>%s</gsx:story>
+                   <gsx:contactok>%t</gsx:contactok>
+                   <gsx:email>%s</gsx:email>
+                   <gsx:phone>%s</gsx:phone>
+                   <gsx:created>%s</gsx:created>
+               </entry>
+        `
+	return fmt.Sprintf(template, attrs.Id, attrs.Location, attrs.Lat, attrs.Lng, attrs.Image, attrs.Story, attrs.ContactOk, attrs.Email, attrs.Phone, attrs.Created)
+}
+
+func (s GoogleSpreadsheetHoopSaver) Save(h Hoop) error {
+	client, err := gspreadsheets.GetClient(s.OAuthClientId, s.OAuthClientSecret, s.OAuthTokenCacheFile)
+	ss := gspreadsheets.Spreadsheet{
+		Client: client,
+		Key:    s.Key,
+	}
+	w, err := ss.GetWorksheet(0)
+
+	row := s.rowXml(h)
+
+	err = w.AddRow(row)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type FilesystemHoopMediaSaver struct {
