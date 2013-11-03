@@ -60,7 +60,8 @@ type Hoop interface {
 	Id() string
 	Created() time.Time
 	Read(reader HoopReader) error
-	Save(saver HoopSaver, mediaSaver HoopMediaSaver) error
+	Save(saver HoopSaver) error
+	SaveMedia(mediaSaver HoopMediaSaver) error
 	MarshalJSON() ([]byte, error)
 	UnmarshalJSON([]byte) error
 }
@@ -181,7 +182,11 @@ func (h *ContributedHoop) Read(reader HoopReader) error {
 	return reader.Read(&hoop)
 }
 
-func (h *ContributedHoop) Save(saver HoopSaver, mediaSaver HoopMediaSaver) error {
+func (h *ContributedHoop) Save(saver HoopSaver) error {
+	return saver.Save(Hoop(h))
+}
+
+func (h *ContributedHoop) SaveMedia(mediaSaver HoopMediaSaver) error {
 	if h.imageFile != nil {
 		filename, err := mediaSaver.Save(Hoop(h), h.imageFile, h.imageFileHeader)
 		if err == nil {
@@ -189,7 +194,7 @@ func (h *ContributedHoop) Save(saver HoopSaver, mediaSaver HoopMediaSaver) error
 		}
 	}
 
-	return saver.Save(Hoop(h))
+	return nil
 }
 
 func (h *ContributedHoop) Id() string {

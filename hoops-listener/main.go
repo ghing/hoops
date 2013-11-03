@@ -49,7 +49,8 @@ func hoopsHandler(w http.ResponseWriter, r *http.Request) {
 	mediaSaver := hoops.FilesystemHoopMediaSaver{DataDir: conf.DataDir}
 	hoop := hoops.NewContributedHoop()
 	hoop.FromRequest(r)
-	err = hoop.Save(hoops.HoopSaver(saver), hoops.HoopMediaSaver(mediaSaver))
+	err = hoop.SaveMedia(hoops.HoopMediaSaver(mediaSaver))
+	err = hoop.Save(hoops.HoopSaver(saver))
 	if err != nil {
 		http.Error(w, "Error saving hoop", http.StatusInternalServerError)
 		return
