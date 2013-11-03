@@ -24,6 +24,10 @@ type HoopsConfig struct {
 	EmailSendingPassword string
 	EmailSendingHost     string
 	NotificationEmail    string
+	OAuthClientId        string
+	OAuthClientSecret    string
+	OAuthTokenCacheFile  string
+	SpreadsheetKey       string
 }
 
 func ParseConfig(filename string, c *HoopsConfig) error {
@@ -55,8 +59,14 @@ type Hoop interface {
 	Attributes() HoopAttributes
 	Id() string
 	Created() time.Time
+	Read(reader HoopReader) error
 	Save(saver HoopSaver, mediaSaver HoopMediaSaver) error
 	MarshalJSON() ([]byte, error)
+	UnmarshalJSON([]byte) error
+}
+
+type HoopReader interface {
+	Read(h *Hoop) error
 }
 
 type HoopSaver interface {
@@ -72,6 +82,28 @@ func getFilenamePrefix(h Hoop) string {
 	dateStr := strings.Replace(h.Created().Format(layout), "-", "", -1)
 	id := strings.Replace(h.Id(), "-", "", -1)
 	return dateStr + "-" + id
+}
+
+type FilesystemHoopReader struct {
+	DataDir string
+}
+
+func (r FilesystemHoopReader) Read(h *Hoop) error {
+	filename := getFilenamePrefix(*h) + ".json"
+	path := filepath.Join(r.DataDir, filename)
+	return r.ReadFromFile(h, path)
+}
+
+func (r FilesystemHoopReader) ReadFromFile(h *Hoop, filename string) error {
+	contents, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(contents, *h)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type FilesystemHoopSaver struct {
@@ -144,6 +176,11 @@ func NewContributedHoop() *ContributedHoop {
 	return &h
 }
 
+func (h *ContributedHoop) Read(reader HoopReader) error {
+	hoop := Hoop(h)
+	return reader.Read(&hoop)
+}
+
 func (h *ContributedHoop) Save(saver HoopSaver, mediaSaver HoopMediaSaver) error {
 	if h.imageFile != nil {
 		filename, err := mediaSaver.Save(Hoop(h), h.imageFile, h.imageFileHeader)
@@ -171,7 +208,7 @@ func (h *ContributedHoop) Attributes() HoopAttributes {
 	return h.attributes
 }
 
-func (h *ContributedHoop) setField(name string, value string) {
+func (h *ContributedHoop) SetField(name string, value string) {
 	s := reflect.ValueOf(&h.attributes).Elem()
 	f := s.FieldByName(name)
 	switch f.Type().Kind() {
@@ -195,13 +232,13 @@ func (h *ContributedHoop) setField(name string, value string) {
 func (h *ContributedHoop) FromRequest(r *http.Request) {
 	// TODO: Use reflect to iterate over the fields more dynamically
 	// See http://blog.golang.org/laws-of-reflection
-	h.setField("Location", r.FormValue("location"))
-	h.setField("Lat", r.FormValue("lat"))
-	h.setField("Lng", r.FormValue("lng"))
-	h.setField("Story", r.FormValue("story"))
-	h.setField("ContactOk", r.FormValue("contact-ok"))
-	h.setField("Email", r.FormValue("email"))
-	h.setField("Phone", r.FormValue("phone"))
+	h.SetField("Location", r.FormValue("location"))
+	h.SetField("Lat", r.FormValue("lat"))
+	h.SetField("Lng", r.FormValue("lng"))
+	h.SetField("Story", r.FormValue("story"))
+	h.SetField("ContactOk", r.FormValue("contact-ok"))
+	h.SetField("Email", r.FormValue("email"))
+	h.SetField("Phone", r.FormValue("phone"))
 	image, header, err := r.FormFile("image")
 	if err == nil {
 		mtype := header.Header.Get("Content-Type")
@@ -214,4 +251,8 @@ func (h *ContributedHoop) FromRequest(r *http.Request) {
 
 func (h *ContributedHoop) MarshalJSON() ([]byte, error) {
 	return json.Marshal(h.Attributes())
+}
+
+func (h *ContributedHoop) UnmarshalJSON(j []byte) error {
+	return json.Unmarshal(j, &h.attributes)
 }
