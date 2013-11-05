@@ -68,6 +68,7 @@ type Hoop interface {
 	SaveMedia(mediaSaver HoopMediaSaver) error
 	MarshalJSON() ([]byte, error)
 	UnmarshalJSON([]byte) error
+	String() string
 }
 
 type HoopReader interface {
@@ -225,6 +226,18 @@ func NewContributedHoop() *ContributedHoop {
 	}
 	h.attributes.Created = time.Now()
 	return &h
+}
+
+func (h *ContributedHoop) String() string {
+	s := ""
+	vals := reflect.ValueOf(&h.attributes).Elem()
+	types := vals.Type()
+	for i := 0; i < vals.NumField(); i++ {
+		v := vals.Field(i)
+		s += fmt.Sprintf("%s: %v\n", types.Field(i).Name, v.Interface())
+	}
+
+	return s
 }
 
 func (h *ContributedHoop) Read(reader HoopReader) error {

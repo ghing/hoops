@@ -66,6 +66,17 @@ func push(filename string) error {
 	return nil
 }
 
+func show(filename string) error {
+	h := &hoops.ContributedHoop{}
+	hoop := hoops.Hoop(h)
+	reader := hoops.FilesystemHoopReader{DataDir: conf.DataDir}
+	reader.ReadFromFile(&hoop, filename)
+
+	fmt.Print(h)
+
+	return nil
+}
+
 func main() {
 	flag.Parse()
 
@@ -89,6 +100,8 @@ func main() {
 		getOAuthToken()
 	case "push":
 		err = push(args[1])
+	case "show":
+		err = show(args[1])
 	}
 
 	if err != nil {
