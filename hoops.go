@@ -84,10 +84,8 @@ type HoopMediaSaver interface {
 }
 
 func getFilenamePrefix(h Hoop) string {
-	const layout = "2006-01-02"
-	dateStr := strings.Replace(h.Created().Format(layout), "-", "", -1)
 	id := strings.Replace(h.Id(), "-", "", -1)
-	return dateStr + "-" + id
+	return id
 }
 
 type FilesystemHoopReader struct {
