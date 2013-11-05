@@ -14,46 +14,80 @@ import (
 
 var conf hoops.HoopsConfig
 var configFilename string
-var oauthCode string
+var cmd Command
 
-func init() {
-	conf = hoops.HoopsConfig{}
-	flag.StringVar(&configFilename, "config", "", "Configuration file")
-	flag.StringVar(&oauthCode, "code", "", "OAuth 2 Authorization Code")
+type Command interface {
+	FlagSet() *flag.FlagSet
+	Handle() error
+	SetConf(hoops.HoopsConfig)
 }
 
-func getOAuthToken() {
-	// Set up a configuration.
-	oauthConfig := gspreadsheets.GetOAuthConfig(conf.OAuthClientId, conf.OAuthClientSecret, conf.OAuthTokenCacheFile)
+type BaseCommand struct {
+	conf  hoops.HoopsConfig
+	flags *flag.FlagSet
+}
 
-	if oauthCode == "" {
+func (c *BaseCommand) SetConf(conf hoops.HoopsConfig) {
+	c.conf = conf
+}
+
+type GetOAuthToken struct {
+	BaseCommand
+	code *string
+}
+
+func (c *GetOAuthToken) FlagSet() *flag.FlagSet {
+	c.flags = flag.NewFlagSet("oauthtoken", flag.ExitOnError)
+	c.code = c.flags.String("code", "", "OAuth 2 Authorization Code")
+
+	return c.flags
+}
+
+func (c *GetOAuthToken) Handle() error {
+	// Set up a configuration.
+	oauthConfig := gspreadsheets.GetOAuthConfig(c.conf.OAuthClientId, c.conf.OAuthClientSecret, c.conf.OAuthTokenCacheFile)
+
+	if *c.code == "" {
 		url := oauthConfig.AuthCodeURL("")
 		fmt.Println("Visit this URL to get a code, then run again with -code=YOUR_CODE\n")
 		fmt.Println(url)
-		return
+		return nil
 	}
 
 	// Set up a Transport using the config.
 	transport := &oauth.Transport{Config: oauthConfig}
 
-	_, err := transport.Exchange(oauthCode)
+	_, err := transport.Exchange(*c.code)
 	if err != nil {
 		log.Fatal("Exchange:", err)
 	}
 
 	// (The Exchange method will automatically cache the token.)
 	fmt.Printf("Token is cached in %v\n", oauthConfig.TokenCache)
+
+	return nil
 }
 
-func push(filename string) error {
+type Push struct {
+	BaseCommand
+}
+
+func (c *Push) FlagSet() *flag.FlagSet {
+	c.flags = flag.NewFlagSet("push", flag.ExitOnError)
+
+	return c.flags
+}
+
+func (c *Push) Handle() error {
+	filename := c.flags.Arg(0)
 	h := hoops.ContributedHoop{}
 	hoop := hoops.Hoop(&h)
 	reader := hoops.FilesystemHoopReader{DataDir: conf.DataDir}
 	saver := hoops.GoogleSpreadsheetHoopSaver{
-		Key:                 conf.SpreadsheetKey,
-		OAuthClientId:       conf.OAuthClientId,
-		OAuthClientSecret:   conf.OAuthClientSecret,
-		OAuthTokenCacheFile: conf.OAuthTokenCacheFile,
+		Key:                 c.conf.SpreadsheetKey,
+		OAuthClientId:       c.conf.OAuthClientId,
+		OAuthClientSecret:   c.conf.OAuthClientSecret,
+		OAuthTokenCacheFile: c.conf.OAuthTokenCacheFile,
 	}
 	reader.ReadFromFile(&hoop, filename)
 
@@ -66,10 +100,15 @@ func push(filename string) error {
 	return nil
 }
 
-func show(filename string) error {
+type Show struct {
+	BaseCommand
+}
+
+func (c *Show) Handle() error {
+	filename := c.flags.Arg(0)
 	h := &hoops.ContributedHoop{}
 	hoop := hoops.Hoop(h)
-	reader := hoops.FilesystemHoopReader{DataDir: conf.DataDir}
+	reader := hoops.FilesystemHoopReader{DataDir: c.conf.DataDir}
 	reader.ReadFromFile(&hoop, filename)
 
 	fmt.Print(h)
@@ -77,9 +116,34 @@ func show(filename string) error {
 	return nil
 }
 
-func main() {
-	flag.Parse()
+func (c *Show) FlagSet() *flag.FlagSet {
+	c.flags = flag.NewFlagSet("show", flag.ExitOnError)
 
+	return c.flags
+}
+
+func init() {
+	conf = hoops.HoopsConfig{}
+}
+
+func main() {
+	cmdName := os.Args[1]
+
+	switch cmdName {
+	default:
+		fmt.Printf("Unknown command: %s\n", cmdName)
+		os.Exit(1)
+	case "oauthtoken":
+		cmd = &GetOAuthToken{}
+	case "push":
+		cmd = &Push{}
+	case "show":
+		cmd = &Show{}
+	}
+
+	flags := cmd.FlagSet()
+	flags.StringVar(&configFilename, "config", "", "Configuration file")
+	flags.Parse(os.Args[2:])
 	if configFilename == "" {
 		fmt.Printf("You must specify a configuration file\n")
 		os.Exit(1)
@@ -88,21 +152,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	cmd.SetConf(conf)
 
-	args := flag.Args()
-	cmd := args[0]
-
-	switch cmd {
-	default:
-		fmt.Printf("Unknown command: %s\n", cmd)
-		os.Exit(1)
-	case "oauthtoken":
-		getOAuthToken()
-	case "push":
-		err = push(args[1])
-	case "show":
-		err = show(args[1])
-	}
+	err = cmd.Handle()
 
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
